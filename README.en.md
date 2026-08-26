@@ -4,6 +4,14 @@ English | [简体中文](README.md)
 
 A native macOS menu-bar break reminder. It stays out of your way until it's time — then a beautiful full-screen nature photo invites you to step away from the screen, look into the distance, and stretch.
 
+## Screenshots
+
+| Reminder | Settings |
+| :---: | :---: |
+| ![Reminder](docs/reminder-en.png) | ![Settings](docs/settings-en.png) |
+
+When a reminder appears, the Start Break button carries the auto-start countdown (e.g. "Start Break (8s)"); when it reaches zero the break begins automatically. You can still delay or start it manually at any time.
+
 Built with **Swift + SwiftUI + a little AppKit, MVVM architecture, zero third-party dependencies**. Requires macOS 13+, native Apple Silicon build. Current version **v1.0.0**.
 
 ## Getting Started
@@ -75,6 +83,10 @@ swift test    # 30 cases: state machine / idle deferral / auto break / cache evi
 ## Scope
 
 No accounts, cloud sync, task management, check-ins, complex statistics, community, subscriptions, ads, or plugin systems — on purpose.
+
+## Acknowledgement
+
+This project's code and documentation were generated with the **[GLM large language model by Z.ai (Zhipu AI)](https://z.ai)** via the ZCode coding agent, which also drove the design, implementation, testing, and release.
 
 ## License
 
