@@ -12,6 +12,15 @@
 
 提醒弹出时「开始休息」按钮直接附带自动倒计时（如「开始休息（9 秒）」），倒计时结束自动进入休息；期间随时可延迟或手动开始。
 
+## 下载安装
+
+[![下载 Pause v1.0.0 (Apple Silicon)](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD-Pause_v1.0.0_arm64-28a745?logo=apple&logoColor=white)](https://github.com/Vindac/pause/releases/download/v1.0.0/Pause-v1.0.0-arm64.dmg)
+
+- **[Pause-v1.0.0-arm64.dmg](https://github.com/Vindac/pause/releases/download/v1.0.0/Pause-v1.0.0-arm64.dmg)**（Apple Silicon / M 系列芯片，macOS 13+）
+- 安装：打开 DMG，把「休一下」拖入「应用程序」文件夹
+- 首次打开若被拦截（ad-hoc 签名无公证）：在「应用程序」中**右键 → 打开**确认一次，或执行 `xattr -cr /Applications/Pause.app`
+- 全部版本见 [Releases](https://github.com/Vindac/pause/releases)；也可从源码构建：`./build.sh`
+
 依据《macOS 休息提醒软件 AI 实现设计方案（MVVM 版）》完整实现：**Swift + SwiftUI + 少量 AppKit，MVVM 架构，零第三方依赖**。最低系统 macOS 13，Apple Silicon 原生构建。当前版本 **v1.0.0**。
 
 ## 运行方式

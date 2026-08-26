@@ -12,6 +12,15 @@ A native macOS menu-bar break reminder. It stays out of your way until it's time
 
 When a reminder appears, the Start Break button carries the auto-start countdown (e.g. "Start Break (8s)"); when it reaches zero the break begins automatically. You can still delay or start it manually at any time.
 
+## Download
+
+[![Download Pause v1.0.0 (Apple Silicon)](https://img.shields.io/badge/Download-Pause_v1.0.0_arm64-28a745?logo=apple&logoColor=white)](https://github.com/Vindac/pause/releases/download/v1.0.0/Pause-v1.0.0-arm64.dmg)
+
+- **[Pause-v1.0.0-arm64.dmg](https://github.com/Vindac/pause/releases/download/v1.0.0/Pause-v1.0.0-arm64.dmg)** (Apple Silicon, macOS 13+)
+- Install: open the DMG and drag **Pause** into /Applications
+- Unsigned (ad-hoc) build — if Gatekeeper blocks the first launch: right-click the app → **Open**, or run `xattr -cr /Applications/Pause.app`
+- See [Releases](https://github.com/Vindac/pause/releases) for all versions, or build from source: `./build.sh`
+
 Built with **Swift + SwiftUI + a little AppKit, MVVM architecture, zero third-party dependencies**. Requires macOS 13+, native Apple Silicon build. Current version **v1.0.0**.
 
 ## Getting Started
