@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "休一下",
+  "version": "2.0.0",
+  "identifier": "com.pause.Pause",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "reminder",
+        "url": "/reminder.html",
+        "title": "Pause Reminder",
+        "width": 900,
+        "height": 600,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "skipTaskbar": true,
+        "focus": false,
+        "alwaysOnTop": true,
+        "center": false
+      },
+      {
+        "label": "settings",
+        "url": "/",
+        "title": "Settings",
+        "width": 560,
+        "height": 640,
+        "minWidth": 540,
+        "minHeight": 620,
+        "visible": false,
+        "resizable": true,
+        "maximizable": false,
+        "fullscreen": false,
+        "center": true,
+        "hiddenTitle": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    },
+    "trayIcon": null
+  },
+  "bundle": {
+    "active": true,
+    "category": "Healthcare and Fitness",
+    "shortDescription": "休一下 Pause",
+    "longDescription": "菜单栏休息提醒工具：到点后用一张漂亮的自然图片提醒你离开屏幕、看看远处、活动身体。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
+  }
+}

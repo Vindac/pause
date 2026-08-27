@@ -1,0 +1,7 @@
+#!/bin/zsh
+# 交叉编译垫片：把 tauri CLI 发起的 cargo build 转发给 cargo xwin（MSVC SDK 由 xwin 提供）
+if [[ "$1" == "build" ]]; then
+  exec cargo xwin "$@"
+else
+  exec command cargo "$@"
+fi

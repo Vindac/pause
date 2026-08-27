@@ -1,101 +1,101 @@
-# Pause (休一下)
+# Pause（休一下）
 
 English | [简体中文](README.md)
 
-A native macOS menu-bar break reminder. It stays out of your way until it's time — then a beautiful full-screen nature photo invites you to step away from the screen, look into the distance, and stretch.
+A menu bar / system tray break reminder for **macOS and Windows**. It stays out of your way until it's time — then a beautiful large-scale nature image reminds you to leave the screen, look into the distance, and stretch.
 
-## Screenshots
+> Since v2.0.0, Pause is rebuilt with [Tauri 2](https://tauri.app) (Rust + Svelte/TypeScript), replacing the single-platform Swift/SwiftUI version. Feature parity with the macOS original is 1:1.
+
+## Preview
 
 | Reminder | Settings |
 | :---: | :---: |
 | ![Reminder](docs/reminder-en.png) | ![Settings](docs/settings-en.png) |
 
-When a reminder appears, the Start Break button carries the auto-start countdown (e.g. "Start Break (8s)"); when it reaches zero the break begins automatically. You can still delay or start it manually at any time.
+When a reminder pops up, the "Start Break" button carries a live auto-start countdown (e.g. "Start Break (9s)"); do nothing and the break begins automatically. You can always delay or start manually.
 
-## Download
+## Highlights
 
-[![Download Pause v1.0.0 (Apple Silicon)](https://img.shields.io/badge/Download-Pause_v1.0.0_arm64-28a745?logo=apple&logoColor=white)](https://github.com/Vindac/pause/releases/download/v1.0.0/Pause-v1.0.0-arm64.dmg)
+- **Menu bar resident** — no Dock/taskbar presence; the tray shows minutes until the next break (`43m`), remaining break time, `⏸` when paused, `!` when due
+- **Counts actual usage time** (default on): keyboard/mouse idle detection postpones the countdown while you are away, locked, in screensaver, display asleep or system asleep; you're reminded only after real usage fills the interval
+- **No reminder storm**: deadlines are absolute timestamps; waking from sleep converts at most one overdue deadline into one reminder; reminders due during lock/screensaver/display-sleep wait and appear within a second of recovery
+- **State machine**: `working → reminding → breaking → working`; delaying postpones by the delay interval only, unlimited times; pause/resume anytime
+- **Wallpaper pipeline**: caches are loaded instantly and next images prefetched in background — popping a reminder **never waits on network**; defaults to picsum.photos random images (customizable to any http(s) URL); downloads are downsampled to ≤3200px and capped at 18 cached files; offline fallback renders one of four built-in gradient scenes
+- **Motion**: slow Ken Burns zoom (1.00→1.05 over 45s round-trip), 0.8s crossfade between wallpapers, 0.4s page crossfade, window fade-in 0.35s / fade-out 0.5s; wallpapers rotate every 25s during breaks
+- **Bilingual UI**: 简体中文 / English with instant switching (default English)
+- Full settings: launch at login, gentle reminder sound, overlay-other-windows, window opacity (30%–100%), all saved immediately
 
-- **[Pause-v1.0.0-arm64.dmg](https://github.com/Vindac/pause/releases/download/v1.0.0/Pause-v1.0.0-arm64.dmg)** (Apple Silicon, macOS 13+)
-- Install: open the DMG and drag **Pause** into /Applications
-- Unsigned (ad-hoc) build — if Gatekeeper blocks the first launch: right-click the app → **Open**, or run `xattr -cr /Applications/Pause.app`
-- See [Releases](https://github.com/Vindac/pause/releases) for all versions, or build from source: `./build.sh`
+## Install
 
-Built with **Swift + SwiftUI + a little AppKit, MVVM architecture, zero third-party dependencies**. Requires macOS 13+, native Apple Silicon build. Current version **v1.0.0**.
+Grab the latest build from [Releases](../../releases):
 
-## Getting Started
+- **macOS**: `.dmg` per architecture. Drag the app into Applications. If blocked by Gatekeeper (unsigned): right-click → Open once, or `xattr -cr "/Applications/Pause.app"`
+- **Windows**: `.msi` or `.exe`. Requires WebView2 Runtime (auto-downloaded if missing)
+
+Build from source:
 
 ```bash
-# Option 1: run from source (note: a bare binary uses a different defaults domain than the .app)
-swift run
-
-# Option 2: build the release .app (Release + ad-hoc signed + icon)
-./build.sh
-open build/Pause.app
+# Prerequisites: Node.js ≥ 18, Rust stable via rustup,
+#   Xcode CLT on macOS / MSVC Build Tools on Windows
+npm install
+npm run tauri build     # bundles land in src-tauri/target/release/bundle/
 ```
 
-- The menu bar always shows the **time until your next break** (e.g. `43m`); the app never occupies the Dock (LSUIElement).
-- During a break the menu bar shows minutes left; when paused it shows `⏸`; when a reminder is waiting it shows `!`.
-- Menu: **next-break countdown / Break Now / Pause Reminders / Settings… / Quit**.
+## Development
 
-## Features
+```bash
+npm install
+npm run tauri dev
+```
 
-- Reminder intervals of 30/45/60 min + custom (10–180 min)
-- **Real-usage timing** (on by default): the timer only counts while you're actively using the Mac — away time, display sleep, and system sleep are excluded, so you're reminded only after real usage fills the interval
-- **Auto-start break** (on by default): once a reminder appears, the Start Break button carries a per-second countdown (10/20/30/60 s); doing nothing automatically starts the break
-- Delay break 1–5 min + custom (1–15 min), unlimited times
-- Custom break duration (1–30 min)
-- Full-bleed wallpaper reminder window (900×600 auto-scaled, 16 pt rounded corners, slow Ken Burns motion, crossfade)
-- Wallpaper pipeline: background prefetch + local cache (max 18 images, auto-eviction, ≤3200 px downsampling) + runtime-generated fallback when offline
-- Manual wallpaper switching with preview
-- Break countdown page + End Early
-- Pause / resume reminders, break now
-- Launch at login (SMAppService)
-- Reminder window opacity (30%–100%, live) and overlay-other-windows option
-- English / 简体中文 UI, switchable instantly
-- Multi-display: the reminder appears centered on the display your pointer is on
-- Smart avoidance: reminders due while the screen is locked / screensaver / display sleep are deferred and shown right after unlock
+Menu items: **next-break countdown / Break Now / Pause Reminders / Settings… / Quit**.
 
 ## Architecture
 
-Unidirectional data flow `View → ViewModel → Service → Model/system`. Views only observe state and send intents; services own timing, networking, caching, and system integration. `ReminderService` is the single source of truth for time. All phases live in an explicit state machine (`working → reminding → breaking`, `reminding → snoozing`, any → `paused`) with an injected clock, fully unit-testable.
-
-See the [Chinese README](README.md) for an in-depth explanation of every subsystem (state machine, idle handling, wallpaper pipeline, multi-display, etc.).
-
-## Project Layout
-
 ```
-Pause/
-├── App/          # @main, app state, localization (builtin zh/en tables), DI container
-├── Models/       # settings, state machine, break session, wallpaper item
-├── ViewModels/   # reminder / break / settings / menu-bar view models
-├── Views/        # reminder page, break page, settings, menu, wallpaper backdrop
-├── Services/     # settings store, reminder timing, wallpaper fetch/cache, activity, login item
-└── Windows/      # borderless non-activating NSPanel, fade in/out
-Tests/PauseTests/ # 30 unit tests
+src-tauri/src/            # Rust — single source of truth for logic & platform access
+├── reminder/service.rs   #   timing state machine: phase/tick/snooze/idle-postponement/storm-guard
+├── settings.rs           #   settings store (write-clamp vs read-fallback semantics, JSON file)
+├── platform/             #   OS bridges: input-idle, lock/screensaver/sleep, multi-display geometry
+├── wallpaper/            #   download, cache eviction (≤18 × ≤3200px), four-theme fallback art
+├── tray.rs               #   tray icon + dynamic menu driven by built-in zh/en strings
+├── windows.rs            #   reminder-window choreography: display placement, scaling, fades
+└── lib.rs                #   wiring + per-second tick → orchestration/tray/push
+src/                      # Svelte 5 + TS — thin view layer (events in, intents out)
 ```
 
-## Testing & Release Build
+Design notes:
+
+- All state-machine advances and tray/window effects run serialized on the main thread (`run_on_main_thread`) — mirroring the original `@MainActor` model. Input-idle seconds are sampled by a background poller thread because querying CGEventSource directly on macOS's main thread deadlocks against the event loop.
+- The view layer never blocks on network.
+- Localization strings live in Rust `l10n.rs`; language switches push the whole dictionary to webviews and rebuild the native menus.
+
+## Tests
 
 ```bash
-swift test    # 30 cases: state machine / idle deferral / auto break / cache eviction / scaling / URL validation
-./build.sh    # produces build/Pause.app (Release, arm64, ad-hoc signed)
+cd src-tauri && cargo test      # 32 cases
 ```
 
-## Known Limitations
+Ported from the original Swift suite: state-machine flows (wake fires exactly once, unlimited snoozes, auto-start break), idle-postponement quadrant cases, ceil-based tray-minute publishing, clamp/fallback setting semantics, wallpaper URL validation, cache eviction plan, downsampling, mm:ss formatting, proportional window scaling.
 
-- No topic filtering for the online image source; wallpapers come from the network (default: picsum.photos random photos).
-- Reminders still appear during other apps' fullscreen presentations (the window never steals focus; lock screen / screensaver / display sleep are avoided).
-- `swift run` and `build/Pause.app` use different UserDefaults domains; use the .app for daily use.
-- Ad-hoc signature runs only on the build machine; redistribution requires re-signing with a Developer ID.
+## Demo modes (development)
 
-## Scope
+```bash
+PAUSE_DEMO=1 npm run tauri dev              # auto: reminder at 2s → start break → quit
+PAUSE_DEMO_SETTINGS=1 npm run tauri dev     # opens Settings then quits after ~4s
+PAUSE_DEBUG=1                               # append diagnostics to /tmp/pause_debug.log
+```
 
-No accounts, cloud sync, task management, check-ins, complex statistics, community, subscriptions, ads, or plugin systems — on purpose.
+## Known differences from the macOS-native original
+
+1. The reminder sound is a bundled synthesized chime.wav instead of NSSound "Tink".
+2. Windows trays cannot show text titles, so remaining minutes ride the tooltip (icon + status line); macOS keeps native text titles like `43m`.
+3. "Overlay other windows" maps to always-on-top, approximating the original `.screenSaver` level.
+4. The cartoon fallback scene is a simplified procedural re-draw in the same spirit.
 
 ## Acknowledgement
 
-This project's code and documentation were generated with the **[GLM large language model by Z.ai (Zhipu AI)](https://z.ai)** via the ZCode coding agent, which also drove the design, implementation, testing, and release.
+Code and docs were produced with assistance from ZCode, powered by GLM models from **[Zhipu AI (Z.ai)](https://z.ai)**.
 
 ## License
 
