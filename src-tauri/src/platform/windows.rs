@@ -27,7 +27,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINF
 use windows::Win32::System::SystemInformation::GetTickCount64;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetCursorPos,
-    SystemParametersInfoW, TranslateMessage, CW_USEDEFAULT, HWND_MESSAGE, MSG, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WINDOW_EX_STYLE, WINDOW_STYLE, WNDCLASSW,
+    RegisterClassW, SystemParametersInfoW, TranslateMessage, CW_USEDEFAULT, HWND_MESSAGE,
+    MSG, SYSTEM_PARAMETERS_INFO_ACTION, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    WINDOW_EX_STYLE, WINDOW_STYLE, WNDCLASSW,
 };
 
 // =====================================================================
@@ -101,9 +103,9 @@ unsafe fn run_message_window() {
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        Some(HWND_MESSAGE),
-        None,
-        Some(hinstance.into()),
+        HWND_MESSAGE,        // message-only 窗口的特殊父句柄（值传递）
+        None,                // hmenu
+        hinstance,           // HINSTANCE 值传递
         None,
     )
     .expect("create message-only window");
@@ -128,37 +130,41 @@ unsafe extern "system" fn session_wndproc(
 ) -> LRESULT {
     let flags = || SESSION_FLAGS.get().cloned();
     match msg {
-        WM_WTSSESSION_CHANGE => match wparam.0 as u32 {
-            WTS_SESSION_LOCK => {
-                if let Some(f) = flags() {
-                    f.set_locked(true);
-                    crate::debug_log::debug_log("session locked");
+        WM_WTSSESSION_CHANGE => {
+            match wparam.0 as u32 {
+                WTS_SESSION_LOCK => {
+                    if let Some(f) = flags() {
+                        f.set_locked(true);
+                        crate::debug_log::debug_log("session locked");
+                    }
                 }
+                WTS_SESSION_UNLOCK => {
+                    if let Some(f) = flags() {
+                        f.set_locked(false);
+                        crate::debug_log::debug_log("session unlocked");
+                    }
+                    if let Some(s) = SESSION_SINK.get() {
+                        let _ = s.send(SessionEvent::Unlocked);
+                    }
+                }
+                _ => {}
             }
-            WTS_SESSION_UNLOCK => {
-                if let Some(f) = flags() {
-                    f.set_locked(false);
-                    crate::debug_log::debug_log("session unlocked");
-                }
-                if let Some(s) = SESSION_SINK.get() {
-                    let _ = s.send(SessionEvent::Unlocked);
-                }
-            }
-            _ => {}
-        },
-        WM_POWERBROADCAST => match wparam.0 as u32 {
-            PBT_APMRESUMEAUTOMATIC | PBT_APMRESUMESUSPEND => {
+            LRESULT(0)
+        }
+        WM_POWERBROADCAST => {
+            if matches!(
+                wparam.0 as u32,
+                PBT_APMRESUMEAUTOMATIC | PBT_APMRESUMESUSPEND
+            ) {
                 crate::debug_log::debug_log("system resumed");
                 if let Some(s) = SESSION_SINK.get() {
                     let _ = s.send(SessionEvent::SystemWake);
                 }
-                LRESULT(1)
             }
-            _ => LRESULT(1),
-        },
-        _ => return DefWindowProcW(hwnd, msg, wparam, lparam),
+            LRESULT(1) // 广播消息返回 TRUE
+        }
+        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
-    LRESULT(0)
 }
 
 /// 屏保运行状态每秒轮询（SPI_GETSCREENSAVERRUNNING）。
@@ -166,19 +172,17 @@ const SPI_GETSCREENSAVERRUNNING: u32 = 0x0072;
 
 pub fn poll_screensaver(flags: &ActivityFlags) {
     unsafe {
-        let mut running: BOOL_LOCAL = BOOL_LOCAL(0);
+        let mut running: i32 = 0;
         let ok = SystemParametersInfoW(
-            SPI_GETSCREENSAVERRUNNING,
+            SYSTEM_PARAMETERS_INFO_ACTION(SPI_GETSCREENSAVERRUNNING),
             0,
-            Some((&mut running.0 as *mut i32).cast()),
+            Some((&mut running as *mut i32).cast()),
             SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
         )
-        .as_bool();
-        flags.set_saver(ok && running.0 != 0);
+        .is_ok();
+        flags.set_saver(ok && running != 0);
     }
 }
-#[repr(C)]
-struct BOOL_LOCAL(i32);
 
 // =====================================================================
 // 多屏几何（物理像素 → 逻辑点）
@@ -270,6 +274,7 @@ fn enumerate_screens() -> Vec<ScreenPhys> {
         .collect()
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct ScreenInfoL {
     pub frame: RectL,
     pub work_area: RectL,

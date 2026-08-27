@@ -26,7 +26,6 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png"]
 
 tokio = { version = "1", features = ["time", "sync", "macros"] }
 uuid = { version = "1", features = ["v4"] }
-objc2-core-foundation = "0.3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58", features = [
@@ -48,6 +47,7 @@ objc2-foundation = { version = "0.3", features = [
   "NSNotification",
   "NSString",
   "NSThread",
+  "NSGeometry",
 ] }
 
 [profile.release]

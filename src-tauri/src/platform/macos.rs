@@ -6,7 +6,7 @@
 
 use super::{ActivityFlags, SessionEvent};
 use objc2::{class, msg_send, runtime::AnyObject};
-use objc2_core_foundation::CGRect;
+use objc2_foundation::{NSPoint, NSRect};
 use objc2_foundation::NSString;
 use block2::RcBlock;
 use std::ptr::NonNull;
@@ -155,7 +155,7 @@ pub struct ScreenInfoL {
     pub work_area: RectL,
 }
 
-fn flip_to_top_left(rect: CGRect, primary_max_y: f64) -> RectL {
+fn flip_to_top_left(rect: NSRect, primary_max_y: f64) -> RectL {
     RectL {
         x: rect.origin.x,
         y: primary_max_y - rect.origin.y - rect.size.height,
@@ -164,7 +164,7 @@ fn flip_to_top_left(rect: CGRect, primary_max_y: f64) -> RectL {
     }
 }
 
-unsafe fn screen_frame(screen: *mut AnyObject) -> CGRect {
+unsafe fn screen_frame(screen: *mut AnyObject) -> NSRect {
     msg_send![screen, frame]
 }
 
@@ -186,7 +186,7 @@ pub fn list_screens() -> Vec<ScreenInfoL> {
         for i in 0..count {
             let s: *mut AnyObject = msg_send![arr, objectAtIndexedSubscript: i];
             let f = screen_frame(s);
-            let v: CGRect = msg_send![s, visibleFrame];
+            let v: NSRect = msg_send![s, visibleFrame];
             out.push(ScreenInfoL {
                 frame: flip_to_top_left(f, primary_max_y),
                 work_area: flip_to_top_left(v, primary_max_y),
@@ -205,7 +205,7 @@ pub fn cursor_position() -> Option<(f64, f64)> {
         }
         let mf = screen_frame(main_screen);
         let primary_max_y = mf.origin.y + mf.size.height;
-        let p: objc2_core_foundation::CGPoint = msg_send![class!(NSEvent), mouseLocation];
+        let p: NSPoint = msg_send![class!(NSEvent), mouseLocation];
         Some((p.x, primary_max_y - p.y))
     }
 }
