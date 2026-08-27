@@ -129,11 +129,7 @@ pub fn hide_reminder(app: &AppHandle) {
 pub fn open_settings(app: &AppHandle) {
     let Some(win) = app.get_webview_window("settings") else { return };
     let lang = crate::current_lang(app);
-    let title = format!(
-        "{} — {}",
-        crate::l10n::tr(lang, "settingsTitle"),
-        crate::l10n::tr(lang, "appName")
-    );
+    let title = crate::l10n::tr(lang, "settingsTitle");
     let _ = win.set_title(title.as_str());
     let _ = win.center();
     let _ = win.show();

@@ -1,7 +1,8 @@
 //! TrayIcon 与下拉菜单：对应原 MenuBarExtra + MenuBarView。
 //!
 //! 双平台标签策略：
-//! - macOS：`TrayIcon::set_title` 直接显示 `43m` / `!` / `⏸` 纯文本（系统自适应深浅）；
+//! - macOS：不设置图标，`TrayIcon::set_title` 只显示 `43m` / `!` / `⏸` 纯文本
+//!   （系统自适应深浅，与原 Swift MenuBarExtra 形态一致）；
 //! - Windows：托盘不支持原生文本标题，显示应用图标 + tooltip 携带完整状态行，
 //!   剩余分钟信息随 tooltip 分钟级刷新。
 //!
@@ -23,6 +24,7 @@ pub struct TrayView {
 
 pub fn build(app: &AppHandle) -> tauri::Result<TrayIcon> {
     let empty_menu = Menu::new(app)?;
+    #[cfg(not(target_os = "macos"))]
     let default_icon = app.default_window_icon().cloned();
     let mut builder = TrayIconBuilder::with_id("pause-tray")
         .tooltip("")
@@ -37,6 +39,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<TrayIcon> {
                 crate::debug_log::debug_log("tray clicked");
             }
         });
+    // macOS 纯文本形态：不设置图标，标签即全部内容
+    #[cfg(not(target_os = "macos"))]
     if let Some(icon) = default_icon {
         builder = builder.icon(icon);
     }

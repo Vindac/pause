@@ -17,7 +17,8 @@ pub mod ranges {
     pub const BREAK_DURATION: (i64, i64) = (1, 30);
     pub const SNOOZE: (i64, i64) = (1, 15);
     pub const IDLE_THRESHOLD: (i64, i64) = (1, 10);
-    pub const AUTO_START_DELAY: (i64, i64) = (5, 300);
+    /// 自动倒计时秒数范围；0 = 提醒弹出后不显示倒计时、直接自动开始休息。
+    pub const AUTO_START_DELAY: (i64, i64) = (0, 300);
     pub const WINDOW_OPACITY: (f64, f64) = (0.3, 1.0);
 }
 
@@ -436,6 +437,13 @@ mod tests {
         assert_eq!(s.reminder_window_opacity, 1.0);
         apply_setting(&mut s, "snoozeMinutes", &serde_json::json!(99));
         assert_eq!(s.snooze_minutes, 15);
+        // 自动倒计时：0 合法（立即休息）；负数钳到 0；超上限钳到 300
+        apply_setting(&mut s, "autoStartBreakDelaySeconds", &serde_json::json!(0));
+        assert_eq!(s.auto_start_break_delay_seconds, 0);
+        apply_setting(&mut s, "autoStartBreakDelaySeconds", &serde_json::json!(-3));
+        assert_eq!(s.auto_start_break_delay_seconds, 0);
+        apply_setting(&mut s, "autoStartBreakDelaySeconds", &serde_json::json!(999));
+        assert_eq!(s.auto_start_break_delay_seconds, 300);
         assert!(matches!(
             apply_setting(&mut s, "noSuchKey", &serde_json::json!(1)),
             SetResult::UnknownKey

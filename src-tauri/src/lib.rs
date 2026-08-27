@@ -397,12 +397,8 @@ fn push_strings(handle: &AppHandle) {
         "strings": l10n::strings_map(lang),
     });
     let _ = handle.emit("strings-changed", payload);
-    // 设置窗标题同步
-    let title = format!(
-        "{} — {}",
-        l10n::tr(lang, "settingsTitle"),
-        l10n::tr(lang, "appName")
-    );
+    // 设置窗标题同步（仅「设置」/「Settings」）
+    let title = l10n::tr(lang, "settingsTitle");
     if let Some(win) = handle.get_webview_window("settings") {
         let _ = win.set_title(title.as_str());
     }

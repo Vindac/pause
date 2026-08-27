@@ -65,14 +65,10 @@
     );
   }
 
-  /** 倒计时选择：「无倒计时」= 关闭自动开始；否则启用并写入秒数。 */
+  /** 倒计时选择：任何选项都启用自动开始；「无」= 0 秒（弹出后立即休息）。 */
   async function setCountdown(v: string) {
-    if (v === "none") {
-      await put("autoStartBreak", false);
-    } else {
-      await put("autoStartBreak", true);
-      await put("autoStartBreakDelaySeconds", Number(v));
-    }
+    await put("autoStartBreak", true);
+    await put("autoStartBreakDelaySeconds", Number(v));
   }
 
   async function commitCustomSnooze() {
@@ -217,10 +213,10 @@
       <div class="row">
         <label>{t("autoStartBreakLabel")}</label>
         <select
-          value={s.autoStartBreak ? String(s.autoStartBreakDelaySeconds) : "none"}
+          value={s.autoStartBreak ? String(s.autoStartBreakDelaySeconds) : "0"}
           onchange={(e) => setCountdown(e.currentTarget.value)}
         >
-          <option value="none">{t("noCountdown")}</option>
+          <option value="0">{t("noCountdown")}</option>
           {#each AUTO_DELAYS as sec}
             <option value={String(sec)}>{t("seconds", { s: sec })}</option>
           {/each}

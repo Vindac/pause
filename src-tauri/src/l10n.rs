@@ -76,7 +76,7 @@ pub const STRINGS: &[(&str, (&str, &str))] = &[
     ("idleThresholdLabel", ("离开判定", "Consider away after")),
     ("autoStartBreakLabel", ("自动开始休息", "Auto-start break")),
     ("autoStartBreakDelayLabel", ("自动倒计时", "Countdown")),
-    ("noCountdown", ("无倒计时", "No countdown")),
+    ("noCountdown", ("无", "None")),
     (
         "autoStartBreakHint",
         (
