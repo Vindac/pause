@@ -1,0 +1,65 @@
+name: Release Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: windows-latest
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Run unit tests (Rust)
+        working-directory: src-tauri
+        run: cargo test --locked ${{ contains(matrix.args, 'aarch64') && '--target aarch64-apple-darwin' || (contains(matrix.args, 'x86_64') && '--target x86_64-apple-darwin' || '') }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Pause ${{ github.ref_name }}"
+          releaseBody: |
+            跨平台休息提醒工具（macOS / Windows）。
+
+            - macOS：Apple Silicon 与 Intel 分别打包，请按芯片选择对应 dmg。
+              未签名首启被拦截：右键 → 打开 确认一次，或 `xattr -cr`。
+            - Windows：安装包需要 WebView2 Runtime（缺失时自动下载）。
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
