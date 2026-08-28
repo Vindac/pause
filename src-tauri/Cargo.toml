@@ -1,6 +1,6 @@
 [package]
 name = "pause"
-version = "2.1.0"
+version = "2.1.1"
 description = "休一下 Pause — 菜单栏休息提醒工具"
 edition = "2021"
 rust-version = "1.82"

@@ -57,6 +57,10 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Pause ${{ github.ref_name }}"
+          # 产品名为中文「休一下」，GitHub 会删除资产名中的非 ASCII 字符，
+          # 导致文件名丢失前缀、latest.json 匹配失败；统一改用 ASCII 模板命名
+          assetNamePattern: "pause_[version]_[arch][setup][ext]"
+          updaterJsonPreferNsis: true
           releaseBody: |
             跨平台休息提醒工具（macOS / Windows）。
 

@@ -3,6 +3,13 @@
 本项目的所有重要变更都记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.1.1] - 2026-08-28
+
+### 修复
+
+- 发布产物文件名丢失 `pause` 前缀（如 `_2.1.0_x64-setup.exe`）：中文产品名「休一下」上传为 GitHub Release 资产时被删除非 ASCII 字符；CI 改用 `assetNamePattern` 统一以 `pause_[版本]_[架构]` 模板命名全部安装包与更新包
+- 应用内更新「立即更新」不可用：资产名被改写导致 tauri-action 匹配签名文件失败、`latest.json` 从未上传（此前 404）；命名统一后自动生成，并优先以 NSIS 安装包作为 Windows 更新通道
+
 ## [2.1.0] - 2026-08-28
 
 ### 修复
@@ -80,3 +87,4 @@
 [1.0.0]: https://github.com/Vindac/pause/releases/tag/v1.0.0
 [2.0.0]: https://github.com/Vindac/pause/releases/tag/v2.0.0
 [2.1.0]: https://github.com/Vindac/pause/releases/tag/v2.1.0
+[2.1.1]: https://github.com/Vindac/pause/releases/tag/v2.1.1
