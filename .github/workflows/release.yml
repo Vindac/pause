@@ -61,7 +61,7 @@ jobs:
             跨平台休息提醒工具（macOS / Windows）。
 
             - macOS：Apple Silicon 与 Intel 分别打包，请按芯片选择对应 dmg。
-              未签名首启被拦截：右键 → 打开 确认一次，或 `xattr -cr`。
+              应用未做 Apple 公证，首启被拦截时：打开「终端」执行 xattr -cr "/Applications/休一下.app" 后即可正常打开。
             - Windows：安装包需要 WebView2 Runtime（缺失时自动下载）。
           releaseDraft: false
           prerelease: false

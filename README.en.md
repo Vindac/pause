@@ -29,7 +29,15 @@ When a reminder pops up, the "Start Break" button carries a live auto-start coun
 
 Grab the latest build from [Releases](../../releases):
 
-- **macOS**: `.dmg` per architecture. Drag the app into Applications. If blocked by Gatekeeper (unsigned): right-click → Open once, or `xattr -cr "/Applications/Pause.app"`
+- **macOS**: `.dmg` per architecture. Drag the app into Applications.
+  The app is not notarized, so the first launch is blocked by Gatekeeper ("damaged and can't be opened" / "unidentified developer").
+  Open Terminal, run the command below, then launch again:
+
+  ```bash
+  xattr -cr "/Applications/休一下.app"
+  ```
+
+  Tip: after typing `xattr -cr `, drag the app from Applications into the Terminal window to autocomplete the path.
 - **Windows**: `.msi` or `.exe`. Requires WebView2 Runtime (auto-downloaded if missing)
 
 Build from source:

@@ -1,7 +1,7 @@
 {
   "name": "pause",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "休一下 Pause — 菜单栏休息提醒工具 (macOS & Windows)",
   "type": "module",
   "scripts": {

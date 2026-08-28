@@ -3,7 +3,12 @@
 本项目的所有重要变更都记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [2.1.0] - 2026-08-28
+
+### 修复
+
+- macOS 安装包提示「已损坏」且无法通过清除隔离属性恢复：未配置签名身份时 Tauri bundler 会静默跳过 codesign，产物缺失 `_CodeSignature/CodeResources` 资源封印，Gatekeeper 强制拒绝；现显式配置 ad-hoc 签名（`bundle.macOS.signingIdentity: "-"`），产物签名完整有效，首启被拦截时执行 `xattr -cr` 即可正常打开
+- 文档：README（中/英）安装说明改为准确的「终端执行 xattr -cr」步骤（此前「右键 → 打开」对未公证应用无效；英文版路径误写为 `Pause.app`）
 
 ### 新增
 
@@ -74,3 +79,4 @@
 
 [1.0.0]: https://github.com/Vindac/pause/releases/tag/v1.0.0
 [2.0.0]: https://github.com/Vindac/pause/releases/tag/v2.0.0
+[2.1.0]: https://github.com/Vindac/pause/releases/tag/v2.1.0

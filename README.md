@@ -29,7 +29,15 @@
 
 前往 [Releases](../../releases) 页面获取最新安装包：
 
-- **macOS**：`.dmg`（Apple Silicon 与 Intel 分包）。打开后将「休一下」拖入「应用程序」。首启若被拦截（未公证）：右键 → 打开确认一次，或执行 `xattr -cr "/Applications/休一下.app"`
+- **macOS**：`.dmg`（Apple Silicon 与 Intel 分包）。打开后将「休一下」拖入「应用程序」。
+  应用未做 Apple 公证，首次双击会被 Gatekeeper 拦截（提示「已损坏」或「无法验证开发者」）。
+  打开「终端」（Terminal，可在启动台搜索），粘贴执行下面这条命令后即可正常打开：
+
+  ```bash
+  xattr -cr "/Applications/休一下.app"
+  ```
+
+  提示：命令末尾的路径也可以输入 `xattr -cr ` 后，把「应用程序」里的「休一下」直接拖进终端窗口自动补全。
 - **Windows**：`.msi` 或 `.exe` 安装包。需要 WebView2 Runtime（缺失时安装器会自动下载）
 
 也可从源码构建：
@@ -79,7 +87,7 @@ src/                      # Svelte 5 + TS：纯视图层（收事件、发意图
 ## 测试
 
 ```bash
-cd src-tauri && cargo test      # 32 个用例
+cd src-tauri && cargo test      # 33 个用例
 ```
 
 覆盖移植自原 Swift 测试套件：状态机全流程（含唤醒只弹一次、无限延迟、自动开始休息）、空闲顺延纯函数四象限、菜单分钟 ceil 语义、设置钳制/回退双语义、壁纸 URL 校验、缓存淘汰计划、降采样、mm:ss 格式化、900×600 小屏等比缩放等。
