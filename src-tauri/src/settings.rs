@@ -60,6 +60,9 @@ pub struct Settings {
     pub reminder_window_opacity: f64,
     /// 语言（english / chinese），随设置一并持久化。
     pub app_language: String,
+    /// 「暂不提醒」的更新版本（内部字段，仅抑制启动自检弹窗）。
+    #[serde(rename = "skippedUpdateVersion")]
+    pub skipped_update_version: String,
 }
 
 impl Default for Settings {
@@ -76,9 +79,10 @@ impl Default for Settings {
             activity_based_timing: true,
             idle_threshold_minutes: 2,
             auto_start_break: true,
-            auto_start_break_delay_seconds: 30,
+            auto_start_break_delay_seconds: 0,
             reminder_window_opacity: 1.0,
-            app_language: "english".into(),
+            app_language: "chinese".into(),
+            skipped_update_version: String::new(),
         }
     }
 }
@@ -179,6 +183,11 @@ impl SettingsFile {
             .and_then(|x| x.as_str())
             .map(str::to_string)
             .unwrap_or_else(|| defaults.app_language.clone());
+        let skipped = v
+            .get("skippedUpdateVersion")
+            .and_then(|x| x.as_str())
+            .map(str::to_string)
+            .unwrap_or_default();
 
         Settings {
             reminder_interval_minutes: get_i(
@@ -230,6 +239,7 @@ impl SettingsFile {
             ),
             reminder_window_opacity: opacity,
             app_language: lang,
+            skipped_update_version: skipped,
         }
     }
 
@@ -364,8 +374,9 @@ mod tests {
         assert!(d.activity_based_timing);
         assert_eq!(d.idle_threshold_minutes, 2);
         assert!(d.auto_start_break);
-        assert_eq!(d.auto_start_break_delay_seconds, 30);
+        assert_eq!(d.auto_start_break_delay_seconds, 0);
         assert_eq!(d.reminder_window_opacity, 1.0);
+        assert_eq!(d.app_language, "chinese");
     }
 
     #[test]

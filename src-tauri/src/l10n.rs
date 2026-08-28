@@ -17,8 +17,8 @@ pub enum Lang {
 impl Lang {
     pub fn parse(s: &str) -> Self {
         match s {
-            "chinese" => Self::Chinese,
-            _ => Self::English, // 默认英文：读不到或解析失败一律回退
+            "english" => Self::English,
+            _ => Self::Chinese, // 默认中文：读不到或解析失败一律回退
         }
     }
     pub fn storage_key(self) -> &'static str {
@@ -76,7 +76,7 @@ pub const STRINGS: &[(&str, (&str, &str))] = &[
     ("idleThresholdLabel", ("离开判定", "Consider away after")),
     ("autoStartBreakLabel", ("自动开始休息", "Auto-start break")),
     ("autoStartBreakDelayLabel", ("自动倒计时", "Countdown")),
-    ("noCountdown", ("无", "None")),
+    ("noCountdown", ("立即", "Immediately")),
     (
         "autoStartBreakHint",
         (
@@ -88,6 +88,10 @@ pub const STRINGS: &[(&str, (&str, &str))] = &[
     // 设置页：图片
     ("sectionWallpaper", ("图片", "Wallpaper")),
     ("switchWallpaper", ("切换图片", "Switch Image")),
+    (
+        "switchWallpaperLoading",
+        ("获取新图中…", "Fetching new image…"),
+    ),
     // 设置页：系统
     ("sectionSystem", ("系统", "System")),
     ("launchAtLoginLabel", ("开机自动启动", "Launch at login")),
@@ -96,6 +100,34 @@ pub const STRINGS: &[(&str, (&str, &str))] = &[
         "overlayLabel",
         ("提醒时覆盖其他窗口", "Reminders overlay other windows"),
     ),
+    // 设置页：检查更新（双通道：应用内更新 / GitHub 下载）
+    ("checkUpdate", ("检查更新", "Check for Updates")),
+    ("updateChecking", ("正在检查…", "Checking…")),
+    ("upToDate", ("已是最新版本", "You're up to date")),
+    (
+        "updateCheckFailed",
+        ("检查更新失败，请稍后重试", "Update check failed, try again later"),
+    ),
+    ("updateAvailable", ("发现新版本 {v}", "New version {v} available")),
+    ("updateNow", ("立即更新", "Update Now")),
+    ("updateFromGithub", ("前往 GitHub 下载", "Get it from GitHub")),
+    (
+        "updateGithubOnlyHint",
+        ("此版本暂不支持应用内更新，请从 GitHub 下载安装。", "In-app update unavailable for this version — please download from GitHub."),
+    ),
+    (
+        "updateDownloading",
+        ("下载中… {p}%", "Downloading… {p}%"),
+    ),
+    (
+        "updateInstalling",
+        ("安装完成，即将重启…", "Installed — restarting…"),
+    ),
+    (
+        "skipUpdateVersion",
+        ("暂不提醒（本版本）", "Skip this version"),
+    ),
+    ("updateLater", ("稍后再说", "Later")),
     // 设置页：提醒窗口
     ("sectionWindow", ("提醒窗口", "Reminder Window")),
     ("windowOpacityLabel", ("窗口透明度", "Window opacity")),
@@ -197,9 +229,10 @@ mod tests {
 
     #[test]
     fn test_full_dictionary_count() {
-        // 内建表 54 条（原版 52 条基础上按同样 key 集合整理，多出者为
-        // snooze 单位等边缘 key，菜单/前端共用同表故计数以本表为准）
-        assert_eq!(STRINGS.len(), 56);
+        // 内建表 69 条（原版 52 条基础上按同样 key 集合整理，多出者为
+        // snooze 单位等边缘 key、切换图片加载态与检查更新双通道文案，
+        // 菜单/前端共用同表故计数以本表为准）
+        assert_eq!(STRINGS.len(), 69);
         // 所有 key 中英都非空
         for (k, (zh, en)) in STRINGS {
             assert!(!k.is_empty() && !zh.is_empty() && !en.is_empty());
@@ -229,18 +262,24 @@ mod tests {
     }
 
     #[test]
-    fn test_default_language_is_english() {
-        assert_eq!(Lang::parse(""), Lang::English);
-        assert_eq!(Lang::parse("chinese"), Lang::Chinese);
+    fn test_default_language_is_chinese() {
+        assert_eq!(Lang::parse(""), Lang::Chinese);
+        assert_eq!(Lang::parse("english"), Lang::English);
         assert_eq!(tr(Lang::English, "appName"), "Pause");
         assert_eq!(tr(Lang::Chinese, "appName"), "休一下");
+        // 「无」改为「立即」：0 秒 = 弹出后直接开始休息
+        assert_eq!(tr(Lang::Chinese, "noCountdown"), "立即");
+        assert_eq!(tr(Lang::English, "noCountdown"), "Immediately");
     }
 
     #[test]
     fn test_maps_cover_all_keys() {
         let m = strings_map(Lang::Chinese);
-        assert_eq!(m.len(), 56);
+        assert_eq!(m.len(), 69);
         assert!(m.contains_key("noCountdown"));
         assert!(m.contains_key("windowOpacityHint"));
+        assert!(m.contains_key("switchWallpaperLoading"));
+        assert!(m.contains_key("updateNow"));
+        assert!(m.contains_key("updateFromGithub"));
     }
 }

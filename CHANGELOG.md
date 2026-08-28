@@ -3,6 +3,21 @@
 本项目的所有重要变更都记录在此文件中。
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 新增
+
+- 检查更新（双通道）：基于 GitHub Releases，无需自建服务器
+  - 通道 A「立即更新」：tauri-plugin-updater 应用内下载签名更新包并自动重启（latest.json 托管在 Release）
+  - 通道 B「前往 GitHub 下载」：跳转 Release 页面手动下载（api.github.com 兜底，旧版 Release 无 latest.json 时仍可用）
+  - 设置页「通用」新增「检查更新」；启动 8 秒后静默自检，发现新版本弹窗（可「暂不提醒（本版本）」）
+
+### 变更
+
+- 默认语言改为中文（首次运行 / 语言值非法回退均为中文）
+- 「自动开始休息」倒计时选项「无」更名「立即」，默认值 30 秒改为立即（0 秒）
+- 「切换图片」改为每次点击强制从网络获取新随机图（picsum.photos 全风格随机），失败才降级本地缓存/兜底图
+
 ## [2.0.0] - 2026-08-27
 
 跨平台重写：整仓由 Swift/SwiftUI（仅 macOS）迁移至 **Tauri 2（Rust 后端 + Svelte 5 / TypeScript 前端）**，同时支持 **macOS 与 Windows**。功能与 v1.0.0 保持 1:1 对齐，原有 30 个单元测试全部以等价用例移植。

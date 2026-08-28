@@ -11,11 +11,27 @@
   import { convertFileSrc } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
 
+  interface UpdateInfo {
+    version: string;
+    tag: string;
+    url: string;
+    notes: string;
+    inAppAvailable: boolean;
+  }
+
   let s = $state<Settings | null>(null);
   let version = $state("");
   let wallpaperPreview = $state("");
+  let switching = $state(false);
   let customSnoozeText = $state("5");
   let customIntervalText = $state("");
+  /** 更新弹窗：发现新版本时非空。 */
+  let updateInfo = $state<UpdateInfo | null>(null);
+  /** idle / checking / downloading / installing */
+  let updatePhase = $state<"idle" | "checking" | "downloading" | "installing">("idle");
+  let downloadPct = $state(0);
+  /** 手动检查的行内状态："" / uptodate / failed */
+  let checkStatus = $state<"" | "uptodate" | "failed">("");
 
   const QUICK_INTERVALS = [30, 45, 60];
   const IDLE_THRESHOLDS = [1, 2, 3, 5];
@@ -32,6 +48,11 @@
     if (p) wallpaperPreview = convertFileSrc(p);
     void listen<{ path: string }>("wallpaper-changed", (e) => {
       wallpaperPreview = convertFileSrc(e.payload.path);
+    });
+    // 启动自检发现新版本 → 直接弹出双通道更新弹窗
+    void listen<UpdateInfo>("update-available", (e) => {
+      updateInfo = e.payload;
+      updatePhase = "idle";
     });
   });
 
@@ -65,7 +86,7 @@
     );
   }
 
-  /** 倒计时选择：任何选项都启用自动开始；「无」= 0 秒（弹出后立即休息）。 */
+  /** 倒计时选择：任何选项都启用自动开始；「立即」= 0 秒（弹出后马上休息）。 */
   async function setCountdown(v: string) {
     await put("autoStartBreak", true);
     await put("autoStartBreakDelaySeconds", Number(v));
@@ -94,9 +115,90 @@
   }
 
   async function switchWallpaper() {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const path = await invoke<string>("switch_wallpaper");
-    if (path) wallpaperPreview = convertFileSrc(path);
+    if (switching) return;
+    switching = true;
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const path = await invoke<string>("switch_wallpaper");
+      if (path) wallpaperPreview = convertFileSrc(path);
+    } finally {
+      switching = false;
+    }
+  }
+
+  // ---------------- 检查更新（双通道） ----------------
+
+  /** 手动检查：Rust 端合并 updater + GitHub API 双通道结果。 */
+  async function checkForUpdate() {
+    if (updatePhase !== "idle") return;
+    updatePhase = "checking";
+    checkStatus = "";
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const info = await invoke<UpdateInfo | null>("check_update");
+      if (info) {
+        updateInfo = info;
+      } else {
+        checkStatus = "uptodate";
+      }
+    } catch {
+      checkStatus = "failed";
+    } finally {
+      updatePhase = "idle";
+    }
+  }
+
+  /** 方案 A：应用内下载 + 安装 + 重启（updater 插件，带签名校验）。 */
+  async function installNow() {
+    if (!updateInfo || updatePhase !== "idle") return;
+    updatePhase = "downloading";
+    downloadPct = 0;
+    let received = 0;
+    let total = 0;
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (!update) {
+        // 竞态下 latest.json 已指向当前版本 → 无需更新
+        updateInfo = null;
+        checkStatus = "uptodate";
+        return;
+      }
+      await update.downloadAndInstall((ev) => {
+        if (ev.event === "Started" && ev.data.contentLength) {
+          total = ev.data.contentLength;
+        } else if (ev.event === "Progress") {
+          received += ev.data.chunkLength;
+          if (total > 0) {
+            downloadPct = Math.min(100, Math.round((received / total) * 100));
+          }
+        } else if (ev.event === "Finished") {
+          downloadPct = 100;
+        }
+      });
+      updatePhase = "installing";
+      const { relaunch } = await import("@tauri-apps/plugin-process");
+      await relaunch();
+    } catch {
+      updatePhase = "idle";
+      checkStatus = "failed";
+    }
+  }
+
+  /** 方案 B：跳转 GitHub Release 页面手动下载。 */
+  async function openGithubRelease() {
+    if (!updateInfo?.url) return;
+    const { openUrl } = await import("@tauri-apps/plugin-opener");
+    await openUrl(updateInfo.url);
+  }
+
+  /** 本版本不再提醒（仅抑制启动自检弹窗）。 */
+  async function skipThisVersion() {
+    if (updateInfo) {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("skip_update_version", { version: updateInfo.version });
+    }
+    updateInfo = null;
   }
 
   const isCustomInterval = $derived(
@@ -121,7 +223,22 @@
       </div>
       <div class="row">
         <label>{t("versionLabel")}</label>
-        <span class="value">{version}</span>
+        <span class="value">v{version}</span>
+      </div>
+      <div class="row">
+        <label>{t("checkUpdate")}</label>
+        <span class="value update-row">
+          <button
+            class="push"
+            type="button"
+            disabled={updatePhase !== "idle"}
+            onclick={checkForUpdate}
+          >
+            {updatePhase === "checking" ? t("updateChecking") : t("checkUpdate")}
+          </button>
+          {#if checkStatus === "uptodate"}<span>{t("upToDate")}</span>
+          {:else if checkStatus === "failed"}<span>{t("updateCheckFailed")}</span>{/if}
+        </span>
       </div>
     </section>
 
@@ -266,8 +383,8 @@
           {:else}
             <div class="preview empty"></div>
           {/if}
-          <button class="push" type="button" onclick={switchWallpaper}>
-            {t("switchWallpaper")}
+          <button class="push" type="button" disabled={switching} onclick={switchWallpaper}>
+            {switching ? t("switchWallpaperLoading") : t("switchWallpaper")}
           </button>
         </div>
       </div>
@@ -324,6 +441,51 @@
       <p class="hint">{t("windowOpacityHint")}</p>
     </section>
   </div>
+
+  <!-- ============ 更新弹窗（双通道） ============ -->
+  {#if updateInfo}
+    <div class="modal-mask">
+      <div class="modal" role="dialog" aria-modal="true">
+        <h3 class="modal-title">{t("updateAvailable", { v: updateInfo.version })}</h3>
+        {#if updateInfo.notes.trim()}
+          <pre class="modal-notes">{updateInfo.notes.trim()}</pre>
+        {/if}
+
+        {#if updatePhase === "downloading"}
+          <p class="modal-status">{t("updateDownloading", { p: downloadPct })}</p>
+          <div class="progress">
+            <div class="progress-bar" style={`width: ${downloadPct}%`}></div>
+          </div>
+        {:else if updatePhase === "installing"}
+          <p class="modal-status">{t("updateInstalling")}</p>
+        {/if}
+
+        {#if updatePhase === "idle"}
+          <div class="modal-buttons">
+            {#if updateInfo.inAppAvailable}
+              <button class="primary" type="button" onclick={installNow}>
+                {t("updateNow")}
+              </button>
+            {/if}
+            <button type="button" onclick={openGithubRelease}>
+              {t("updateFromGithub")}
+            </button>
+          </div>
+          {#if !updateInfo.inAppAvailable}
+            <p class="hint">{t("updateGithubOnlyHint")}</p>
+          {/if}
+          <div class="modal-secondary">
+            <button class="link" type="button" onclick={skipThisVersion}>
+              {t("skipUpdateVersion")}
+            </button>
+            <button class="link" type="button" onclick={() => (updateInfo = null)}>
+              {t("updateLater")}
+            </button>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <style>
@@ -427,4 +589,104 @@
   }
   .slider-row input[type="range"] { flex: 1; accent-color: #0a84ff; }
   .pct { min-width: 44px; text-align: right; opacity: 0.65; }
+  .update-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ---------- 更新弹窗 ---------- */
+  .modal-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    width: 400px;
+    max-width: calc(100% - 32px);
+    max-height: calc(100% - 48px);
+    overflow: auto;
+    background: #f7f7f8;
+    color: #1d1d1f;
+    border-radius: 12px;
+    padding: 18px 20px 14px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  }
+  @media (prefers-color-scheme: dark) {
+    .modal { background: #2c2c2e; color: #f5f5f7; }
+  }
+  .modal-title {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .modal-notes {
+    margin: 0 0 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 180px;
+    overflow: auto;
+    opacity: 0.85;
+    font-family: inherit;
+  }
+  .modal-status {
+    font-size: 13px;
+    margin: 4px 0 8px;
+  }
+  .progress {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(128, 128, 130, 0.25);
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: #0a84ff;
+    border-radius: 3px;
+    transition: width 0.2s ease-out;
+  }
+  .modal-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .modal-buttons button {
+    appearance: none;
+    border: 1px solid rgba(128, 128, 130, 0.35);
+    background: rgba(127, 127, 129, 0.14);
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: inherit;
+  }
+  .modal-buttons button:hover { background: rgba(127, 127, 129, 0.24); }
+  .modal-buttons button.primary {
+    border-color: #0a84ff;
+    background: #0a84ff;
+    color: #fff;
+    font-weight: 600;
+  }
+  .modal-buttons button.primary:hover { background: #3a9bff; }
+  .modal-secondary {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+  }
+  .link {
+    appearance: none;
+    border: none;
+    background: none;
+    color: #0a84ff;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
 </style>

@@ -118,6 +118,22 @@ impl WallpaperService {
         });
     }
 
+    /// 立即从网络抓一张新图（设置窗「切换图片」专用）：成功则入缓存并设为
+    /// 当前图，同时补位下一张预取；失败返回 None，由调用方降级 advance()。
+    /// 图片源为默认/自定义 URL，每次请求服务端随机出图（风格不限）。
+    pub async fn fetch_fresh(&self) -> Option<PathBuf> {
+        // 作废在途预取，避免与本次结果竞争
+        self.generation.fetch_add(1, Ordering::Relaxed);
+        let url = self.effective_url();
+        let path = self
+            .online
+            .fetch_next(Some(url.as_str()), Arc::clone(&self.cache))
+            .await?;
+        *self.current.write().unwrap() = Some(path.clone());
+        self.spawn_prefetch();
+        Some(path)
+    }
+
     pub fn current_path(&self) -> Option<PathBuf> {
         self.current.read().unwrap().clone()
     }

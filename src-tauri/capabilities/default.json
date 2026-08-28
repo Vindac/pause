@@ -1,7 +1,16 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "提醒窗口与设置窗口的默认能力：仅需核心事件 API 与资源协议。",
+  "description": "提醒窗口与设置窗口的默认能力：核心事件 API、资源协议与更新相关权限。",
   "windows": ["reminder", "settings"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "updater:default",
+    "process:allow-restart",
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "https://github.com/**" }]
+    }
+  ]
 }

@@ -17,3 +17,8 @@ Thumbs.db
 
 # 本地工具配置
 .zcode/
+
+# 本机开发辅助脚本（含机器特定路径，不入库）
+run-dev.bat
+run-tests.bat
+run-build.bat

@@ -54,6 +54,9 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -89,6 +92,7 @@ pub fn run() {
             start_tick_loop(app.handle());
             start_session_watch(app.handle());
             run_demo_mode(app.handle());
+            spawn_startup_update_check(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -106,7 +110,10 @@ pub fn run() {
             act_resume,
             open_settings_window,
             quit_app,
-            app_version
+            app_version,
+            check_update,
+            github_latest_release,
+            skip_update_version
         ])
         .run(tauri::generate_context!())
         .expect("error while running pause");
@@ -624,10 +631,17 @@ fn sync_launch_at_login(app: &AppHandle, desired: bool) {
     }
 }
 
+/// 「切换图片」：每次强制从网络获取一张新随机图；网络失败才降级本地 advance。
+/// 返回最终图片路径，供设置窗即时刷新预览（reminder 窗走事件）。
 #[tauri::command]
-fn switch_wallpaper(app: AppHandle) {
-    let path = app.state::<AppState>().wallpapers.advance();
+async fn switch_wallpaper(app: AppHandle) -> String {
+    let wallpapers = app.state::<AppState>().wallpapers.clone();
+    let path = match wallpapers.fetch_fresh().await {
+        Some(p) => p,
+        None => wallpapers.advance(),
+    };
     push_wallpaper(&app, &path);
+    path.to_string_lossy().into_owned()
 }
 
 #[tauri::command]
@@ -673,6 +687,204 @@ fn quit_app(app: AppHandle) {
 #[tauri::command]
 fn app_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
+}
+
+// =====================================================================
+// 检查更新（双通道：应用内 updater 下载 / 跳转 GitHub Release 页）
+// =====================================================================
+
+const GITHUB_LATEST_API: &str = "https://api.github.com/repos/Vindac/pause/releases/latest";
+const GITHUB_RELEASE_PAGE: &str = "https://github.com/Vindac/pause/releases/latest";
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GithubReleaseInfo {
+    /// Release tag（如 "v2.0.1"）。
+    tag: String,
+    /// Release 页面地址。
+    url: String,
+    /// 更新说明正文。
+    notes: String,
+}
+
+/// 「v2.0.1」/「2.0.1」→ (2, 0, 1)；解析失败返回 None。
+fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
+    let t = s.trim().trim_start_matches(['v', 'V']);
+    let mut it = t.split('.');
+    let a = it.next()?.parse().ok()?;
+    let b = it.next()?.parse().ok()?;
+    let c = it.next().unwrap_or("0").parse().ok()?;
+    Some((a, b, c))
+}
+
+/// 严格更新判定：a > b 才算有更新；任一版本非法视为无更新。
+fn semver_newer(a: &str, b: &str) -> bool {
+    match (parse_semver(a), parse_semver(b)) {
+        (Some(x), Some(y)) => x > y,
+        _ => false,
+    }
+}
+
+async fn fetch_github_latest() -> Option<GithubReleaseInfo> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .ok()?;
+    let resp = client
+        .get(GITHUB_LATEST_API)
+        .header("User-Agent", "pause-updater") // GitHub API 强制要求 UA
+        .send()
+        .await
+        .ok()?;
+    if resp.status().as_u16() != 200 {
+        return None; // 无 Release / 限流 / 网络失败
+    }
+    let body = resp.text().await.ok()?;
+    let v: serde_json::Value = serde_json::from_str(&body).ok()?;
+    let tag = v.get("tag_name")?.as_str()?.to_string();
+    Some(GithubReleaseInfo {
+        url: v
+            .get("html_url")
+            .and_then(|x| x.as_str())
+            .unwrap_or(GITHUB_RELEASE_PAGE)
+            .to_string(),
+        notes: v
+            .get("body")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string(),
+        tag,
+    })
+}
+
+/// 双通道探测结果：前端弹窗据此渲染两个按钮的可用性。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    /// 更新版本号（无 v 前缀）。
+    pub version: String,
+    /// GitHub Release tag。
+    pub tag: String,
+    /// Release 页面地址（「前往 GitHub 下载」按钮目标）。
+    pub url: String,
+    /// 更新说明。
+    pub notes: String,
+    /// 应用内 updater 通道是否可用（latest.json 存在且版本更新）。
+    pub in_app_available: bool,
+}
+
+/// 双通道探测：GitHub API 判断是否有新版本；updater 插件判断能否应用内安装。
+/// 任一通道发现新版本即返回 Some。
+async fn collect_update_info(handle: &AppHandle) -> Option<UpdateInfo> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    let current = env!("CARGO_PKG_VERSION");
+    let gh = fetch_github_latest().await;
+    let gh_newer = gh
+        .as_ref()
+        .map(|g| semver_newer(&g.tag, current))
+        .unwrap_or(false);
+
+    // updater 通道：latest.json 只会由带签名的 Release 生成，
+    // 旧版本 Release 无此文件 → check 失败，仅剩 GitHub 跳转通道。
+    let mut updater_version: Option<String> = None;
+    if let Ok(updater) = handle.updater_builder().build() {
+        if let Ok(Some(update)) = updater.check().await {
+            updater_version = Some(update.version.clone());
+        }
+    }
+    let in_app_available = updater_version
+        .as_deref()
+        .map(|v| semver_newer(v, current))
+        .unwrap_or(false);
+
+    if !gh_newer && !in_app_available {
+        return None;
+    }
+    let (tag, url, notes) = match gh {
+        Some(g) => (g.tag, g.url, g.notes),
+        None => (
+            format!("v{}", updater_version.unwrap_or_default()),
+            GITHUB_RELEASE_PAGE.to_string(),
+            String::new(),
+        ),
+    };
+    Some(UpdateInfo {
+        version: tag.trim_start_matches(['v', 'V']).to_string(),
+        tag,
+        url,
+        notes,
+        in_app_available,
+    })
+}
+
+/// 手动「检查更新」：无更新返回 null，有更新返回双通道信息。
+#[tauri::command]
+async fn check_update(app: AppHandle) -> Option<UpdateInfo> {
+    collect_update_info(&app).await
+}
+
+/// 方案 B 独立通道：GitHub 最新 Release 原始信息（tag / 页面 / 说明）。
+#[tauri::command]
+async fn github_latest_release() -> Option<GithubReleaseInfo> {
+    fetch_github_latest().await
+}
+
+/// 「暂不提醒（本版本）」：仅抑制启动自检弹窗，手动检查不受影响。
+#[tauri::command]
+fn skip_update_version(app: AppHandle, version: String) {
+    let state = app.state::<AppState>();
+    {
+        let mut s = state.settings.lock().unwrap();
+        s.skipped_update_version = version;
+    }
+    let _ = state
+        .settings_file
+        .save(&state.settings.lock().unwrap().clone());
+}
+
+/// 启动 8 秒后静默检查一次：发现新版本且未被跳过 → 弹开设置窗并广播事件，
+/// 前端渲染双通道更新弹窗（立即更新 / 前往 GitHub 下载）。
+fn spawn_startup_update_check(handle: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(8)).await;
+        let Some(info) = collect_update_info(&handle).await else {
+            return;
+        };
+        let skipped = {
+            let state = handle.state::<AppState>();
+            let v = state.settings.lock().unwrap().skipped_update_version.clone();
+            v
+        };
+        if skipped == info.version || skipped == info.tag {
+            return;
+        }
+        debug_log::debug_log(&format!(
+            "update available: {} (in-app: {})",
+            info.tag, info.in_app_available
+        ));
+        let _ = handle.emit("update-available", &info);
+        windows::open_settings(&handle);
+    });
+}
+
+#[cfg(test)]
+mod update_tests {
+    use super::*;
+
+    #[test]
+    fn test_semver_compare() {
+        assert!(semver_newer("v2.0.1", "2.0.0"));
+        assert!(semver_newer("2.1.0", "2.0.9"));
+        assert!(semver_newer("v3.0.0", "2.99.99"));
+        assert!(!semver_newer("v2.0.0", "2.0.0"));
+        assert!(!semver_newer("v1.9.9", "2.0.0"));
+        // 非法输入一律视为无更新
+        assert!(!semver_newer("", "2.0.0"));
+        assert!(!semver_newer("latest", "2.0.0"));
+        assert_eq!(parse_semver("v2.1"), Some((2, 1, 0)));
+        assert_eq!(parse_semver("abc"), None);
+    }
 }
 
 // =====================================================================

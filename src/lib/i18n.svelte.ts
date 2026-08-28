@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 export const L10n = $state<{ lang: string; strings: Record<string, string> }>({
-  lang: "english",
+  lang: "chinese",
   strings: {},
 });
 
